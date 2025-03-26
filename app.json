@@ -1,0 +1,9 @@
+{
+  "name": "TeamUp",
+  "displayName": "TeamUp",
+  "extra": {
+    "eas": {
+      "projectId": "c4e9a05c-504e-49d7-8320-6ba48e3cfca6"
+    }
+  }
+}

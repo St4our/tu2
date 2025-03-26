@@ -1,0 +1,54 @@
+name: deps
+description: Common deps for mobile repo
+
+runs:
+  using: composite
+  steps:
+    - name: ci/setup-node
+      uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
+      with:
+        node-version-file: ".nvmrc"
+        cache: "npm"
+        cache-dependency-path: package-lock.json
+
+    - name: ci/install-npm-dependencies
+      shell: bash
+      env:
+        NODE_ENV: development
+      run: |
+        echo "::group::install-npm-dependencies"
+        npm ci --ignore-scripts
+        node node_modules/\@sentry/cli/scripts/install.js
+        echo "::endgroup::"
+
+    - name: Cache Node.js modules
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: ci/patch-npm-dependencies
+      shell: bash
+      run: |
+        echo "::group::patch-npm-dependencies"
+        npx patch-package
+        echo "::endgroup::"
+
+    - name: ci/generate-assets
+      shell: bash
+      run: |
+        echo "::group::generate-assets"
+        node ./scripts/generate-assets.js
+        echo "::endgroup::"
+
+    - name: ci/import-compass-icon
+      shell: bash
+      env:
+        COMPASS_ICONS: "node_modules/@mattermost/compass-icons/font/compass-icons.ttf"
+      run: |
+        echo "::group::import-compass-icon"
+        cp "$COMPASS_ICONS" "assets/fonts/"
+        cp "$COMPASS_ICONS" "android/app/src/main/assets/fonts"
+        echo "::endgroup::"

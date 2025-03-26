@@ -1,0 +1,60 @@
+---
+name: build-android-beta
+
+on:
+  push:
+    branches:
+      - build-beta-[0-9]+
+      - build-beta-android-[0-9]+
+
+env:
+  NODE_VERSION: 20.13.1
+  TERM: xterm
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: ci/checkout-repo
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - name: ci/test
+        uses: ./.github/actions/test
+
+  build-and-deploy-android-beta:
+    runs-on: ubuntu-22.04
+    needs:
+      - test
+    steps:
+      - name: ci/checkout-repo
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: ci/prepare-android-build
+        uses: ./.github/actions/prepare-android-build
+        env:
+          STORE_FILE: "${{ secrets.MM_MOBILE_STORE_FILE }}"
+          STORE_ALIAS: "${{ secrets.MM_MOBILE_STORE_ALIAS }}"
+          STORE_PASSWORD: "${{ secrets.MM_MOBILE_STORE_PASSWORD }}"
+          MATTERMOST_BUILD_GH_TOKEN: "${{ secrets.MATTERMOST_BUILD_GH_TOKEN }}"
+
+      - name: ci/build-and-deploy-android-beta
+        env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.MM_MOBILE_BETA_AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.MM_MOBILE_BETA_AWS_SECRET_ACCESS_KEY }}"
+          MATTERMOST_WEBHOOK_URL: "${{ secrets.MM_MOBILE_BETA_MATTERMOST_WEBHOOK_URL }}"
+          SENTRY_AUTH_TOKEN: "${{ secrets.MM_MOBILE_SENTRY_AUTH_TOKEN }}"
+          SENTRY_DSN_ANDROID: ${{ secrets.MM_MOBILE_BETA_SENTRY_DSN_ANDROID }}
+          SUPPLY_JSON_KEY: ${{ github.workspace }}/mattermost-mobile-private/android/mattermost-credentials.json
+        run: |
+          echo "::group::Build"
+          bundle exec fastlane android build --env android.beta
+          echo "::endgroup::"
+          echo "::group::Deploy to Play Store"
+          bundle exec fastlane android deploy file:"${{ github.workspace }}/*.apk" --env android.beta
+          echo "::endgroup::"
+        working-directory: ./fastlane
+
+      - name: ci/upload-android-beta-build
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: android-build-beta-${{ github.run_id }}
+          path: "*.apk"
